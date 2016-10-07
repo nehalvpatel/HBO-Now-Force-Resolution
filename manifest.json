@@ -1,0 +1,31 @@
+{
+  "name": "HBO Now • Force Resolution",
+  "version": "1.0.0",
+  "manifest_version": 2,
+  "description": "Allows you to force 1080p HD video on HBONow.com.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "page": "src/bg/background.html",
+    "persistent": true
+  },
+  "page_action": {
+    "default_icon": "icons/icon19.png",
+    "default_title": "HBO Now Resolution",
+    "default_popup": "src/page_action/page_action.html"
+  },
+  "permissions": [
+    "*://*.hbonow.com/",
+    "webRequestBlocking",
+    "webRequest",
+    "declarativeContent",
+    "storage"
+  ],
+  "content_scripts": [{
+    "matches": ["*://*.hbonow.com/*"],
+    "js": ["src/inject/inject.js"]
+  }]
+}
