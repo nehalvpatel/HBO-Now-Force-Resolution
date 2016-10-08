@@ -1,5 +1,7 @@
 # HBO Now • Force Resolution
-Allows you to force 1080p HD video on HBONow.com.
+Brings the ability to manually choose resolutions on the HBO Now player. You can force whatever resolution you want, whether it's 1080p or 360p.
+
+Without this extension, the viewing experience was erratic and unseemly. No more fuzzy pictures or sudden drops in quality.
 
 ## Screenshot
 ![Screenshot](/screenshot.png?raw=true)
