@@ -1,6 +1,7 @@
 window.onload = function () {
     chrome.storage.sync.get({"resolution": "1080"}, function(data) {
         document.getElementById(data["resolution"]).checked = true;
+        document.getElementById("nearest").innerText = data["resolution"] + "p";
     });
 
     var radios = document.forms["quality"].elements["resolution"];
@@ -17,6 +18,7 @@ window.onload = function () {
                 chrome.tabs.sendMessage(tabs[0].id, {"event": "restartVideo"});
             });
 
+            document.getElementById("nearest").innerText = this.value + "p";
             ga("send", "event", "Resolution", "change", this.value);
         }
     }

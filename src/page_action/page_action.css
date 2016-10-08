@@ -9,7 +9,6 @@ body {
 }
 #mainPopup {
     padding: 10px;
-    height: 200px;
     width: 150px;
 }
 .hbo-logo {
@@ -25,6 +24,11 @@ body {
 .quality-controls {
     padding-left: 10px;
     text-align: left;
+}
+.nearest-label {
+    text-align: left;
+    margin-left: 15px;
+    padding-bottom: 10px;
 }
 @font-face {
     font-family: 'Gotham 5r';

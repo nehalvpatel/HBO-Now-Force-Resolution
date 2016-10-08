@@ -2,8 +2,7 @@ var allTabs = {};
 
 var desiredResolution = "1080";
 chrome.storage.sync.get({ "resolution": "1080" }, function(data) {
-    console.log("Desired resolution is " + data["resolution"] + "p.");
-    desiredResolution = data["resolution"];
+    resolutionSwitched(data["resolution"]);
 });
 
 chrome.webRequest.onBeforeRequest.addListener(handleRequest, { urls: ["*://*.hbonow.com/hls*"] }, ["blocking"]);
@@ -20,12 +19,17 @@ function handleRequest(details) {
 
                     let m;
                     var currentStream = {};
+                    var hasDesiredHeight = false;
                     var lines = xhr.responseText.split('\n');
                     for (var i = 0; i < lines.length; i++) {
                         if (lines[i].indexOf("EXT-X-STREAM-INF") !== -1) {
                             if ((m = regex.exec(lines[i])) !== null) {
                                 let resolution = m[5].replace("=", "").split("x");
                                 currentStream["height"] = resolution[1];
+
+                                if (currentStream["height"] == desiredResolution) {
+                                    hasDesiredHeight = true;
+                                }
                             }
                         } else if (lines[i].indexOf(".m3u8") !== -1) {
                             if (lines[i].indexOf("URI") === -1) {
@@ -36,8 +40,18 @@ function handleRequest(details) {
                             }
                         }
                     }
+                    
+                    allTabs[details.tabId] = {};
+                    allTabs[details.tabId]["streams"] = tabStreams;
 
-                    allTabs[details.tabId] = tabStreams;
+                    if (hasDesiredHeight) {
+                        console.log("[#" + details.tabId + "] Has desired height of " + desiredResolution + "p.");
+                    } else {
+                        console.log("[#" + details.tabId + "] Does not have desired height of " + desiredResolution + "p.");
+                    }
+
+                    allTabs[details.tabId]["hasDesiredHeight"] = hasDesiredHeight;
+                    allTabs[details.tabId]["targetResolution"] = calculateTarget(details.tabId, allTabs[details.tabId]["streams"]);
                 }
             }
 
@@ -46,16 +60,20 @@ function handleRequest(details) {
         }
     } else {
         if (allTabs.hasOwnProperty(details.tabId)) {
-            let streams = allTabs[details.tabId];
+            let streams = allTabs[details.tabId]["streams"];
+            let targetResolution = allTabs[details.tabId]["targetResolution"];
+
             for (var i = 0; i < streams.length; i++) {
                 let stream = streams[i];
-                if (stream["height"] != desiredResolution) {
-                    if (stream["url"] == details.url) {
+                if (stream["url"] == details.url) {
+                    if (stream["height"] != targetResolution) {
                         console.log("[#" + details.tabId + "] Cancelled " + stream["height"] + "p.");
 
                         return {
                             cancel: true
                         };
+                    } else {
+                        console.log("[#" + details.tabId + "] Allowed " + stream["height"] + "p.");
                     }
                 }
             }
@@ -70,8 +88,7 @@ function handleRequest(details) {
 chrome.runtime.onMessage.addListener(
     function(request, sender, sendResponse) {
         if (request.event == "resolutionSwitch") {
-            console.log("Desired resolution is " + request["value"] + "p.");
-            desiredResolution = request["value"];
+            resolutionSwitched(request["value"]);
         }
     }
 );
@@ -90,3 +107,37 @@ chrome.runtime.onInstalled.addListener(function() {
         }]);
     });
 });
+
+function resolutionSwitched(res) {
+    console.log("Desired resolution is " + res + "p.");
+    desiredResolution = res;
+
+    for (var tabId in allTabs) {
+        // skip loop if the property is from prototype
+        if (!allTabs.hasOwnProperty(tabId)) continue;
+
+        allTabs[tabId]["targetResolution"] = calculateTarget(tabId, allTabs[tabId]["streams"]);
+    }
+}
+
+function calculateTarget(tabid, strs) {
+    let actualStreams = [];
+    for (var i = 0; i < strs.length; i++) {
+        actualStreams.push(parseInt(strs[i]["height"]));
+    }
+
+    let closestResolution = closest(actualStreams, desiredResolution);
+    console.log("[#" + tabid + "] " + "Target resolution is " + closestResolution + "p.");
+
+    return closestResolution;
+}
+
+function closest(arr, closestTo){
+    var closest = Math.max.apply(null, arr);
+    
+    for(var i = 0; i < arr.length; i++){
+        if(arr[i] >= closestTo && arr[i] < closest) closest = arr[i];
+    }
+    
+    return closest;
+}
