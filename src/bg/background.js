@@ -1,89 +1,10 @@
 var allTabs = {};
+var desiredResolution;
+const playlistRegex = /.*?(BANDWIDTH)(.*?)(,)(RESOLUTION)(.*?)(,)/i;
 
-var desiredResolution = "1080";
-chrome.storage.sync.get({ "resolution": "1080" }, function(data) {
+chrome.storage.sync.get({ "resolution": 1080 }, function(data) {
     resolutionSwitched(data["resolution"]);
 });
-
-chrome.webRequest.onBeforeRequest.addListener(handleRequest, { urls: ["*://*.hbonow.com/hls*"] }, ["blocking"]);
-function handleRequest(details) {
-    if (details.url.indexOf("master") != -1) {
-        if (details.tabId > -1) {
-            console.log("[#" + details.tabId + "] New playlist.");
-
-            var xhr = new XMLHttpRequest();
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState == XMLHttpRequest.DONE) {
-                    var tabStreams = [];
-                    const regex = /.*?(BANDWIDTH)(.*?)(,)(RESOLUTION)(.*?)(,)/i;
-
-                    let m;
-                    var currentStream = {};
-                    var hasDesiredHeight = false;
-                    var lines = xhr.responseText.split('\n');
-                    for (var i = 0; i < lines.length; i++) {
-                        if (lines[i].indexOf("EXT-X-STREAM-INF") !== -1) {
-                            if ((m = regex.exec(lines[i])) !== null) {
-                                let resolution = m[5].replace("=", "").split("x");
-                                currentStream["height"] = resolution[1];
-
-                                if (currentStream["height"] == desiredResolution) {
-                                    hasDesiredHeight = true;
-                                }
-                            }
-                        } else if (lines[i].indexOf(".m3u8") !== -1) {
-                            if (lines[i].indexOf("URI") === -1) {
-                                currentStream["url"] = details.url.substring(0, details.url.lastIndexOf("/")) + "/" + lines[i];
-
-                                tabStreams.push(currentStream);
-                                currentStream = {};
-                            }
-                        }
-                    }
-                    
-                    allTabs[details.tabId] = {};
-                    allTabs[details.tabId]["streams"] = tabStreams;
-
-                    if (hasDesiredHeight) {
-                        console.log("[#" + details.tabId + "] Has desired height of " + desiredResolution + "p.");
-                    } else {
-                        console.log("[#" + details.tabId + "] Does not have desired height of " + desiredResolution + "p.");
-                    }
-
-                    allTabs[details.tabId]["hasDesiredHeight"] = hasDesiredHeight;
-                    allTabs[details.tabId]["targetResolution"] = calculateTarget(details.tabId, allTabs[details.tabId]["streams"]);
-                }
-            }
-
-            xhr.open("GET", details.url);
-            xhr.send(null);
-        }
-    } else {
-        if (allTabs.hasOwnProperty(details.tabId)) {
-            let streams = allTabs[details.tabId]["streams"];
-            let targetResolution = allTabs[details.tabId]["targetResolution"];
-
-            for (var i = 0; i < streams.length; i++) {
-                let stream = streams[i];
-                if (stream["url"] == details.url) {
-                    if (stream["height"] != targetResolution) {
-                        console.log("[#" + details.tabId + "] Cancelled " + stream["height"] + "p.");
-
-                        return {
-                            cancel: true
-                        };
-                    } else {
-                        console.log("[#" + details.tabId + "] Allowed " + stream["height"] + "p.");
-                    }
-                }
-            }
-        }
-    }
-
-    return {
-        cancel: false
-    };
-}
 
 chrome.runtime.onMessage.addListener(
     function(request, sender, sendResponse) {
@@ -108,36 +29,129 @@ chrome.runtime.onInstalled.addListener(function() {
     });
 });
 
-function resolutionSwitched(res) {
-    console.log("Desired resolution is " + res + "p.");
-    desiredResolution = res;
+chrome.webRequest.onBeforeRequest.addListener(handleRequest, { urls: ["*://*.hbonow.com/hls*"] }, ["blocking"]);
+function handleRequest(details) {
+    if (details.url.indexOf("master") != -1) {
+        if (details.tabId > -1) {
+            logData(details.tabId, "New playlist.");
 
-    for (var tabId in allTabs) {
-        // skip loop if the property is from prototype
-        if (!allTabs.hasOwnProperty(tabId)) continue;
+            let playlistRequest = new XMLHttpRequest();
+            playlistRequest.onreadystatechange = function() {
+                if (playlistRequest.readyState == XMLHttpRequest.DONE) {
+                    allTabs[details.tabId] = {};
+                    allTabs[details.tabId]["allStreams"] = [];
+                    allTabs[details.tabId]["resolutions"] = [];
 
-        allTabs[tabId]["targetResolution"] = calculateTarget(tabId, allTabs[tabId]["streams"]);
+                    let currentStream = {};
+                    let hasDesiredHeight = false;
+                    let playlistLines = playlistRequest.responseText.split('\n');
+                    for (let i = 0; i < playlistLines.length; i++) {
+                        if (playlistLines[i].indexOf("EXT-X-STREAM-INF") !== -1) {
+                            let matches;
+                            if ((matches = playlistRegex.exec(playlistLines[i])) !== null) {
+                                let resolution = matches[5].replace("=", "").split("x");
+                                let height = parseInt(resolution[1]);
+
+                                currentStream["height"] = height;
+                                allTabs[details.tabId]["resolutions"].push(height);
+
+                                if (height == desiredResolution) {
+                                    hasDesiredHeight = true;
+                                }
+                            }
+                        } else if (playlistLines[i].indexOf(".m3u8") !== -1) {
+                            if (playlistLines[i].indexOf("URI") === -1) {
+                                currentStream["url"] = details.url.substring(0, details.url.lastIndexOf("/")) + "/" + playlistLines[i];
+
+                                allTabs[details.tabId]["allStreams"].push(currentStream);
+                                currentStream = {};
+                            }
+                        }
+                    }
+
+                    if (hasDesiredHeight) {
+                        logData(details.tabId, "Has desired height of " + desiredResolution + "p.");
+                    } else {
+                        logData(details.tabId, "Does not have desired height of " + desiredResolution + "p.");
+                    }
+
+                    calculateStreams(details.tabId);
+                }
+            }
+
+            playlistRequest.open("GET", details.url);
+            playlistRequest.send(null);
+        }
+    } else {
+        if (allTabs.hasOwnProperty(details.tabId)) {
+            if (allTabs[details.tabId]["blockedStreams"].hasOwnProperty(details.url)) {
+                logData(details.tabId, "Cancelled " + allTabs[details.tabId]["blockedStreams"][details.url] + "p.");
+
+                return {
+                    cancel: true
+                };
+            } else if (allTabs[details.tabId]["allowedStreams"].hasOwnProperty(details.url)) {
+                logData(details.tabId, "Allowed " + allTabs[details.tabId]["allowedStreams"][details.url] + "p.")
+            }
+        }
+    }
+
+    return {
+        cancel: false
+    };
+}
+
+function resolutionSwitched(resolution) {
+    logData(null, "Desired resolution is " + resolution + "p.");
+
+    desiredResolution = parseInt(resolution);
+
+    Object.keys(allTabs).forEach(function (tabId) {
+        calculateStreams(tabId);
+    });
+}
+
+function calculateStreams(tabId) {
+    let allStreams = allTabs[tabId]["allStreams"];
+
+    allTabs[tabId]["allowedStreams"] = {};
+    allTabs[tabId]["blockedStreams"] = {};
+
+    let targetResolution = closest(allTabs[tabId]["resolutions"], desiredResolution);
+    logData(tabId, "Target resolution is " + targetResolution + "p.");
+
+    for (let i = 0; i < allStreams.length; i++) {
+        let currentStream = allStreams[i];
+        let streamKey;
+
+        if (currentStream["height"] == targetResolution) {
+            streamKey = "allowedStreams";
+        } else {
+            streamKey = "blockedStreams";
+        }
+
+        allTabs[tabId][streamKey][currentStream["url"]] = currentStream["height"];
     }
 }
 
-function calculateTarget(tabid, strs) {
-    let actualStreams = [];
-    for (var i = 0; i < strs.length; i++) {
-        actualStreams.push(parseInt(strs[i]["height"]));
-    }
-
-    let closestResolution = closest(actualStreams, desiredResolution);
-    console.log("[#" + tabid + "] " + "Target resolution is " + closestResolution + "p.");
-
-    return closestResolution;
-}
-
-function closest(arr, closestTo){
-    var closest = Math.max.apply(null, arr);
+function closest(arr, closestTo) {
+    let closest = Math.max.apply(null, arr);
     
-    for(var i = 0; i < arr.length; i++){
-        if(arr[i] >= closestTo && arr[i] < closest) closest = arr[i];
+    for (let i = 0; i < arr.length; i++) {
+        if (arr[i] >= closestTo && arr[i] < closest) closest = arr[i];
     }
     
     return closest;
+}
+
+function logData(tabId, message) {
+    if (tabId !== null) {
+        if (message == "New playlist.") {
+            console.log("%c[#" + tabId + "] " + message, "font-weight: bold;");
+        } else {
+            console.log("[#" + tabId + "] " + message);
+        }
+    } else {
+        console.log(message);
+    }
 }

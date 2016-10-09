@@ -1,6 +1,6 @@
 window.onload = function () {
-    chrome.storage.sync.get({"resolution": "1080"}, function(data) {
-        document.getElementById(data["resolution"]).checked = true;
+    chrome.storage.sync.get({ "resolution": 1080 }, function(data) {
+        document.getElementById(data["resolution"].toString()).checked = true;
         document.getElementById("nearest").innerText = data["resolution"] + "p";
     });
 
@@ -11,8 +11,8 @@ window.onload = function () {
             radio_data["event"] = "resolutionSwitch";
             radio_data["value"] = this.value;
 
+            chrome.storage.sync.set({ "resolution": parseInt(this.value) });
             chrome.runtime.sendMessage(radio_data);
-            chrome.storage.sync.set({"resolution": this.value});
             
             chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
                 chrome.tabs.sendMessage(tabs[0].id, {"event": "restartVideo"});
