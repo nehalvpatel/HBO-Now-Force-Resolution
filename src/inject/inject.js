@@ -1,8 +1,11 @@
 chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
     if (msg.event === "restartVideo") {
-        if (document.getElementById("video-player")) {
-            var player = document.getElementById("video-player").innerHTML;
-            document.getElementById("video-player").innerHTML = player;
+        let videoPlayer = document.getElementById("video-player");
+        if (videoPlayer) {
+            if (Object.keys(videoPlayer.getElementsByClassName("video-poster")).length == 0) {
+                var player = videoPlayer.innerHTML;
+                videoPlayer.innerHTML = player;
+            }
         }
     } else if (msg.event == "getTitle") {
         let videoTitle = "";
