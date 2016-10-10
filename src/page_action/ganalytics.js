@@ -22,23 +22,25 @@ function getRandomToken() {
     return hex;
 }
 
-chrome.storage.sync.get('userid', function(items) {
-    var userid = items.userid;
-    if (userid) {
-        useToken(userid);
-    } else {
-        userid = getRandomToken();
-        chrome.storage.sync.set({ userid: userid }, function() {
+function initAnalytics(page) {
+    chrome.storage.sync.get('userid', function(items) {
+        var userid = items.userid;
+        if (userid) {
             useToken(userid);
-        });
-    }
+        } else {
+            userid = getRandomToken();
+            chrome.storage.sync.set({ userid: userid }, function() {
+                useToken(userid);
+            });
+        }
 
-    function useToken(userid) {
-        ga('create', 'UA-85393349-1', 'auto', {
-            userId: userid
-        });
-        ga('set', 'checkProtocolTask', function() {}); // Removes failing protocol check. @see: http://stackoverflow.com/a/22152353/1958200
-        ga('require', 'displayfeatures');
-        ga('send', 'pageview', '/page_action.html');
-    }
-});
+        function useToken(userid) {
+            ga('create', 'UA-85393349-1', 'auto', {
+                userId: userid
+            });
+            ga('set', 'checkProtocolTask', function() {}); // Removes failing protocol check. @see: http://stackoverflow.com/a/22152353/1958200
+            ga('require', 'displayfeatures');
+            ga('send', 'pageview', '/' + page);
+        }
+    });
+}

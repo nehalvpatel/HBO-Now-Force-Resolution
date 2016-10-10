@@ -2,6 +2,8 @@ var allTabs = {};
 var desiredResolution;
 const playlistRegex = /.*?(BANDWIDTH)(.*?)(,)(RESOLUTION)(.*?)(,)/i;
 
+initAnalytics("background.html");
+
 chrome.storage.sync.get({ "resolution": 1080 }, function(data) {
     resolutionSwitched(data["resolution"]);
 });
@@ -91,7 +93,17 @@ function handleRequest(details) {
                     cancel: true
                 };
             } else if (allTabs[details.tabId]["allowedStreams"].hasOwnProperty(details.url)) {
-                logData(details.tabId, "Allowed " + allTabs[details.tabId]["allowedStreams"][details.url] + "p.")
+                let allowedResolution = allTabs[details.tabId]["allowedStreams"][details.url];
+                logData(details.tabId, "Allowed " + allowedResolution + "p.");
+
+                chrome.tabs.sendMessage(details.tabId, { "event": "getTitle", "resolution": allowedResolution }, function(content) {
+                    ga("send", "event", {
+                        "eventCategory": "Video",
+                        "eventAction": "Play",
+                        "eventLabel": content["videoTitle"],
+                        "eventValue": allowedResolution
+                    });
+                });
             }
         }
     }
