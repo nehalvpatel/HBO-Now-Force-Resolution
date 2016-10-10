@@ -10,11 +10,6 @@
     m.parentNode.insertBefore(a, m)
 })(window, document, 'script', 'https://www.google-analytics.com/analytics.js', 'ga');
 
-ga('create', 'UA-85393349-1', 'auto');
-ga('set', 'checkProtocolTask', function() {}); // Removes failing protocol check. @see: http://stackoverflow.com/a/22152353/1958200
-ga('require', 'displayfeatures');
-ga('send', 'pageview', '/page_action.html');
-
 function getRandomToken() {
     // E.g. 8 * 32 = 256 bits token
     var randomPool = new Uint8Array(32);
@@ -39,6 +34,11 @@ chrome.storage.sync.get('userid', function(items) {
     }
 
     function useToken(userid) {
-        ga('set', 'userId', userid);
+        ga('create', 'UA-85393349-1', 'auto', {
+            userId: userid
+        });
+        ga('set', 'checkProtocolTask', function() {}); // Removes failing protocol check. @see: http://stackoverflow.com/a/22152353/1958200
+        ga('require', 'displayfeatures');
+        ga('send', 'pageview', '/page_action.html');
     }
 });
