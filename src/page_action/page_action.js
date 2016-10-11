@@ -23,9 +23,9 @@ window.onload = function () {
             document.getElementById("nearest").innerText = this.value + "p";
 
             ga("send", "event", {
-                "eventCategory": "Resolution",
+                "eventCategory": "DesiredResolution",
                 "eventAction": "Change",
-                "eventValue": parseInt(this.value)
+                "eventLabel": this.value + "p"
             });
         }
     }

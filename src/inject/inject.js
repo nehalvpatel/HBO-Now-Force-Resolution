@@ -12,7 +12,7 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
 
         let dataBootstrap = {};
         let dataBootstrapRegex;
-        if ((dataBootstrapRegex = document.documentElement.innerHTML.match(/dataBootstrap = (.*),/)) !== null) {
+        if ((dataBootstrapRegex = document.documentElement.innerHTML.match(/dataBootstrap = (.*)[;|,]/)) !== null) {
             dataBootstrap = JSON.parse(dataBootstrapRegex[1]);
         }
 

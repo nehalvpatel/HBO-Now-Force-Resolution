@@ -96,13 +96,14 @@ function handleRequest(details) {
                 let allowedResolution = allTabs[details.tabId]["allowedStreams"][details.url];
                 logData(details.tabId, "Allowed " + allowedResolution + "p.");
 
-                chrome.tabs.sendMessage(details.tabId, { "event": "getTitle", "resolution": allowedResolution }, function(content) {
-                    ga("send", "event", {
-                        "eventCategory": "Video",
-                        "eventAction": "Play",
-                        "eventLabel": content["videoTitle"],
-                        "eventValue": allowedResolution
-                    });
+                chrome.tabs.sendMessage(details.tabId, { "event": "getTitle" }, function(content) {
+                    ga("send", "event", "Video", "Play",
+                        {
+                            "dimension1": content["videoTitle"],
+                            "dimension2": desiredResolution + "p",
+                            "dimension3": allowedResolution + "p"
+                        }
+                    );
                 });
             }
         }
