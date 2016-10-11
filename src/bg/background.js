@@ -31,18 +31,21 @@ chrome.runtime.onInstalled.addListener(function() {
     });
 });
 
-chrome.webRequest.onBeforeRequest.addListener(handleRequest, { urls: ["*://*.hbonow.com/hls*"] }, ["blocking"]);
+chrome.webRequest.onBeforeRequest.addListener(handleRequest, { urls: ["*://*.hbonow.com/*master*m3u8"] }, ["blocking"]);
 function handleRequest(details) {
-    if (details.url.indexOf("master") != -1) {
-        if (details.tabId > -1) {
-            logData(details.tabId, "New playlist.");
+    if (details.tabId > -1) {
+        logData(details.tabId, "New playlist.");
 
-            let playlistRequest = new XMLHttpRequest();
-            playlistRequest.onreadystatechange = function() {
-                if (playlistRequest.readyState == XMLHttpRequest.DONE) {
-                    allTabs[details.tabId] = {};
-                    allTabs[details.tabId]["allStreams"] = [];
-                    allTabs[details.tabId]["resolutions"] = [];
+        let playlistRequest = new XMLHttpRequest();
+        playlistRequest.onreadystatechange = function() {
+            if (playlistRequest.readyState == XMLHttpRequest.DONE) {
+                if (playlistRequest.getResponseHeader("Content-Type") == "audio/x-mpegurl") {
+                    removeListeners(details.tabId);
+
+                    let currentTab = {};
+                    currentTab["streams"] = [];
+                    currentTab["handlers"] = [];
+                    currentTab["resolutions"] = [];
 
                     let currentStream = {};
                     let hasDesiredHeight = false;
@@ -55,7 +58,7 @@ function handleRequest(details) {
                                 let height = parseInt(resolution[1]);
 
                                 currentStream["height"] = height;
-                                allTabs[details.tabId]["resolutions"].push(height);
+                                currentTab["resolutions"].push(height);
 
                                 if (height == desiredResolution) {
                                     hasDesiredHeight = true;
@@ -65,7 +68,7 @@ function handleRequest(details) {
                             if (playlistLines[i].indexOf("URI") === -1) {
                                 currentStream["url"] = details.url.substring(0, details.url.lastIndexOf("/")) + "/" + playlistLines[i];
 
-                                allTabs[details.tabId]["allStreams"].push(currentStream);
+                                currentTab["streams"].push(currentStream);
                                 currentStream = {};
                             }
                         }
@@ -77,36 +80,14 @@ function handleRequest(details) {
                         logData(details.tabId, "Does not have desired height of " + desiredResolution + "p.");
                     }
 
+                    allTabs[details.tabId] = currentTab;
                     calculateStreams(details.tabId);
                 }
             }
-
-            playlistRequest.open("GET", details.url);
-            playlistRequest.send(null);
         }
-    } else {
-        if (allTabs.hasOwnProperty(details.tabId)) {
-            if (allTabs[details.tabId]["blockedStreams"].hasOwnProperty(details.url)) {
-                logData(details.tabId, "Cancelled " + allTabs[details.tabId]["blockedStreams"][details.url] + "p.");
 
-                return {
-                    cancel: true
-                };
-            } else if (allTabs[details.tabId]["allowedStreams"].hasOwnProperty(details.url)) {
-                let allowedResolution = allTabs[details.tabId]["allowedStreams"][details.url];
-                logData(details.tabId, "Allowed " + allowedResolution + "p.");
-
-                chrome.tabs.sendMessage(details.tabId, { "event": "getTitle" }, function(content) {
-                    ga("send", "event", "Video", "Play",
-                        {
-                            "dimension1": content["videoTitle"],
-                            "dimension2": desiredResolution + "p",
-                            "dimension3": allowedResolution + "p"
-                        }
-                    );
-                });
-            }
-        }
+        playlistRequest.open("GET", details.url);
+        playlistRequest.send(null);
     }
 
     return {
@@ -120,30 +101,70 @@ function resolutionSwitched(resolution) {
     desiredResolution = parseInt(resolution);
 
     Object.keys(allTabs).forEach(function (tabId) {
+        tabId = parseInt(tabId);
+        
+        removeListeners(tabId);
         calculateStreams(tabId);
     });
 }
 
-function calculateStreams(tabId) {
-    let allStreams = allTabs[tabId]["allStreams"];
+function removeListeners(tabId) {
+    if (allTabs[tabId]) {
+        for (let i = 0; i < allTabs[tabId]["handlers"].length; i++) {
+            chrome.webRequest.onBeforeRequest.removeListener(allTabs[tabId]["handlers"][i]);
+        }
+        
+        allTabs[tabId]["handlers"] = [];
+    }
+}
 
-    allTabs[tabId]["allowedStreams"] = {};
-    allTabs[tabId]["blockedStreams"] = {};
+function calculateStreams(tabId) {
+    let allStreams = allTabs[tabId]["streams"];
 
     let targetResolution = closest(allTabs[tabId]["resolutions"], desiredResolution);
     logData(tabId, "Target resolution is " + targetResolution + "p.");
 
     for (let i = 0; i < allStreams.length; i++) {
         let currentStream = allStreams[i];
-        let streamKey;
+        let handlerIndex;
 
         if (currentStream["height"] == targetResolution) {
-            streamKey = "allowedStreams";
+            handlerIndex = allTabs[tabId]["handlers"].push(function(details) {
+                let currentResolution = currentStream["height"];
+                logData(details.tabId, "Allowed " + currentResolution + "p.");
+
+                chrome.tabs.sendMessage(details.tabId, { "event": "getTitle" }, function(content) {
+                    ga("send", "event", "Video", "Play",
+                        {
+                            "dimension1": content["videoTitle"],
+                            "dimension2": desiredResolution + "p",
+                            "dimension3": currentResolution + "p"
+                        }
+                    );
+                });
+
+                return {
+                    cancel: false
+                };
+            }) - 1;
         } else {
-            streamKey = "blockedStreams";
+            handlerIndex = allTabs[tabId]["handlers"].push(function(details) {
+                let currentResolution = currentStream["height"];
+                logData(details.tabId, "Cancelled " + currentResolution + "p.");
+
+                return {
+                    cancel: true
+                };
+            }) - 1;
         }
 
-        allTabs[tabId][streamKey][currentStream["url"]] = currentStream["height"];
+        chrome.webRequest.onBeforeRequest.addListener(allTabs[tabId]["handlers"][handlerIndex],
+            {
+                "urls": [currentStream["url"]],
+                "tabId": tabId
+            },
+            ["blocking"]
+        );
     }
 }
 
