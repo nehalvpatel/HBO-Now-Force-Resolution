@@ -1,7 +1,6 @@
 window.onload = function () {
-    initAnalytics("page_action.html");
-
     chrome.storage.sync.get({ "resolution": 1080 }, function(data) {
+        initAnalytics("page_action.html", data["resolution"] + "p");
         document.getElementById(data["resolution"].toString()).checked = true;
         document.getElementById("nearest").innerText = data["resolution"] + "p";
     });
@@ -22,6 +21,7 @@ window.onload = function () {
 
             document.getElementById("nearest").innerText = this.value + "p";
 
+            ga("set", "dimension4", this.value + "p");
             ga("send", "event", {
                 "eventCategory": "DesiredResolution",
                 "eventAction": "Change",

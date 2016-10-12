@@ -22,7 +22,7 @@ function getRandomToken() {
     return hex;
 }
 
-function initAnalytics(page) {
+function initAnalytics(page, resolution) {
     chrome.storage.sync.get('userid', function(items) {
         var userid = items.userid;
         if (userid) {
@@ -39,9 +39,19 @@ function initAnalytics(page) {
                 userId: userid
             });
             ga('set', 'checkProtocolTask', function() {}); // Removes failing protocol check. @see: http://stackoverflow.com/a/22152353/1958200
-            ga('set', 'dimension4', chrome.app.getDetails().version);
+            ga('set', 'appName', chrome.app.getDetails().name);
+            ga('set', 'appVersion', chrome.app.getDetails().version);
+            ga("set", "dimension4", resolution);
             ga('require', 'displayfeatures');
-            ga('send', 'pageview', '/' + page);
+
+            if (page == "page_action.html") {
+                chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+                    ga('set', 'referrer', tabs[0].url);
+                    ga('send', 'pageview', '/' + page);
+                });
+            } else if (page == "background.html") {
+                ga('send', 'pageview', '/' + page);
+            }
         }
     });
 }

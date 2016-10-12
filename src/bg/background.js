@@ -2,10 +2,10 @@ var allTabs = {};
 var desiredResolution;
 const playlistRegex = /.*?(BANDWIDTH)(.*?)(,)(RESOLUTION)(.*?)(,)/i;
 
-initAnalytics("background.html");
 chrome.webRequest.onBeforeRequest.addListener(handleRequest, { urls: ["*://*.hbonow.com/*master*m3u8"] }, ["blocking"]);
 
 chrome.storage.sync.get({ "resolution": 1080 }, function(data) {
+    initAnalytics("background.html", data["resolution"] + "p");
     resolutionSwitched(data["resolution"]);
 });
 
