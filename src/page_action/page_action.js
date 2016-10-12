@@ -21,11 +21,11 @@ window.onload = function () {
 
             document.getElementById("nearest").innerText = this.value + "p";
 
-            ga("set", "dimension4", this.value + "p");
             ga("send", "event", {
                 "eventCategory": "DesiredResolution",
                 "eventAction": "Change",
-                "eventLabel": this.value + "p"
+                "eventLabel": this.value + "p",
+                "dimension4": this.value + "p"
             });
         }
     }

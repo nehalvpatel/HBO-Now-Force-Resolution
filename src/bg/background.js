@@ -128,7 +128,8 @@ function calculateStreams(tabId) {
                         {
                             "dimension1": content["videoTitle"],
                             "dimension2": desiredResolution + "p",
-                            "dimension3": currentResolution + "p"
+                            "dimension3": currentResolution + "p",
+                            "dimension4": desiredResolution + "p"
                         }
                     );
                 });
