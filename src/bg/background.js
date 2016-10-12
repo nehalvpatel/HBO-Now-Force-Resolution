@@ -3,6 +3,7 @@ var desiredResolution;
 const playlistRegex = /.*?(BANDWIDTH)(.*?)(,)(RESOLUTION)(.*?)(,)/i;
 
 initAnalytics("background.html");
+chrome.webRequest.onBeforeRequest.addListener(handleRequest, { urls: ["*://*.hbonow.com/*master*m3u8"] }, ["blocking"]);
 
 chrome.storage.sync.get({ "resolution": 1080 }, function(data) {
     resolutionSwitched(data["resolution"]);
@@ -31,7 +32,6 @@ chrome.runtime.onInstalled.addListener(function() {
     });
 });
 
-chrome.webRequest.onBeforeRequest.addListener(handleRequest, { urls: ["*://*.hbonow.com/*master*m3u8"] }, ["blocking"]);
 function handleRequest(details) {
     if (details.tabId > -1) {
         logData(details.tabId, "New playlist.");
