@@ -1,6 +1,17 @@
 var allTabs = {};
 var desiredResolution;
-const playlistRegex = /.*?(BANDWIDTH)(.*?)(,)(RESOLUTION)(.*?)(,)/i;
+const playlistRegex = [
+    {
+        "regex": /.*?(BANDWIDTH)[=](.*?)[,](CODECS)[=](.*?)(RESOLUTION)[=](.*?)[,](CLOSED-CAPTIONS)[=](.*?)[\r\n?|\n](.*?)[\r\n?|\n]/gi,
+        "resolutionIndex": 6,
+        "urlIndex": 9
+    },
+    {
+        "regex": /.*?(BANDWIDTH)[=](.*?)[,](CODECS)[=](.*?)(RESOLUTION)[=](.*?)[,](URI)[=]"(.*?)"[\r\n?|\n]/gi,
+        "resolutionIndex": 6,
+        "urlIndex": 8
+    }
+];
 
 chrome.webRequest.onBeforeRequest.addListener(handleRequest, { urls: ["*://*.hbonow.com/*master*m3u8"] }, ["blocking"]);
 
@@ -43,38 +54,17 @@ function handleRequest(details) {
                     removeListeners(details.tabId);
 
                     let currentTab = {};
-                    currentTab["streams"] = [];
                     currentTab["handlers"] = [];
                     currentTab["resolutions"] = [];
+                    currentTab["streams"] = [];
 
-                    let currentStream = {};
-                    let hasDesiredHeight = false;
-                    let playlistLines = playlistRequest.responseText.split('\n');
-                    for (let i = 0; i < playlistLines.length; i++) {
-                        if (playlistLines[i].indexOf("EXT-X-STREAM-INF") !== -1) {
-                            let matches;
-                            if ((matches = playlistRegex.exec(playlistLines[i])) !== null) {
-                                let resolution = matches[5].replace("=", "").split("x");
-                                let height = parseInt(resolution[1]);
-
-                                currentStream["height"] = height;
-                                currentTab["resolutions"].push(height);
-
-                                if (height == desiredResolution) {
-                                    hasDesiredHeight = true;
-                                }
-                            }
-                        } else if (playlistLines[i].indexOf(".m3u8") !== -1) {
-                            if (playlistLines[i].indexOf("URI") === -1) {
-                                currentStream["url"] = details.url.substring(0, details.url.lastIndexOf("/")) + "/" + playlistLines[i];
-
-                                currentTab["streams"].push(currentStream);
-                                currentStream = {};
-                            }
-                        }
+                    for (let i = 0; i < playlistRegex.length; i++) {
+                        let currentMatches = matchPlaylist(playlistRegex[i], playlistRequest.responseText, details.url);
+                        Array.prototype.push.apply(currentTab["resolutions"], currentMatches["resolutions"]);
+                        Array.prototype.push.apply(currentTab["streams"], currentMatches["streams"]);
                     }
 
-                    if (hasDesiredHeight) {
+                    if (currentTab["resolutions"].indexOf(desiredResolution) > -1) {
                         logData(details.tabId, "Has desired height of " + desiredResolution + "p.");
                     } else {
                         logData(details.tabId, "Does not have desired height of " + desiredResolution + "p.");
@@ -166,6 +156,33 @@ function calculateStreams(tabId) {
             ["blocking"]
         );
     }
+}
+
+function matchPlaylist(regex, playlist, url) {
+    let currentRegex = regex["regex"];
+    let resolutions = [];
+    let streams = [];
+
+    let matches;
+    while ((matches = currentRegex.exec(playlist)) !== null) {
+        // This is necessary to avoid infinite loops with zero-width matches
+        if (matches.index === currentRegex.lastIndex) {
+            currentRegex.lastIndex++;
+        }
+        
+        let currentHeight = parseInt(matches[regex["resolutionIndex"]].split("x")[1]);
+        resolutions.push(currentHeight);
+
+        streams.push({
+            "height": currentHeight,
+            "url": url.substring(0, url.lastIndexOf("/")) + "/" + matches[regex["urlIndex"]]
+        });
+    }
+
+    return {
+        "resolutions": resolutions,
+        "streams": streams
+    };
 }
 
 function closest(arr, closestTo) {
