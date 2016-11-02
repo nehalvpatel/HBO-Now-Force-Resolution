@@ -3,11 +3,13 @@ var desiredResolution;
 const playlistRegex = [
     {
         "regex": /.*?(BANDWIDTH)[=](.*?)[,](CODECS)[=](.*?)(RESOLUTION)[=](.*?)[,](CLOSED-CAPTIONS)[=](.*?)[\r\n?|\n](.*?)[\r\n?|\n]/gi,
+        "bitrateIndex": 2,
         "resolutionIndex": 6,
         "urlIndex": 9
     },
     {
         "regex": /.*?(BANDWIDTH)[=](.*?)[,](CODECS)[=](.*?)(RESOLUTION)[=](.*?)[,](URI)[=]"(.*?)"[\r\n?|\n]/gi,
+        "bitrateIndex": 2,
         "resolutionIndex": 6,
         "urlIndex": 8
     }
@@ -114,11 +116,21 @@ function calculateStreams(tabId) {
     let targetResolution = closest(allTabs[tabId]["resolutions"], desiredResolution);
     logData(tabId, "Target resolution is " + targetResolution + "p.");
 
+    let allowedBitrates = [];
+    for (let i = 0; i < allStreams.length; i++) {
+        if (allStreams[i]["height"] == targetResolution) {
+            allowedBitrates.push(allStreams[i]["bitrate"]);
+        }
+    }
+
+    let targetBitrate = Math.max.apply(Math, allowedBitrates);
+    logData(tabId, "Target bitrate is " + targetBitrate + ".");
+
     for (let i = 0; i < allStreams.length; i++) {
         let currentStream = allStreams[i];
         let handlerIndex;
 
-        if (currentStream["height"] == targetResolution) {
+        if ((currentStream["height"] == targetResolution) && (currentStream["bitrate"] == targetBitrate)) {
             handlerIndex = allTabs[tabId]["handlers"].push(function(details) {
                 let currentResolution = currentStream["height"];
                 logData(details.tabId, "Allowed " + currentResolution + "p.");
@@ -175,6 +187,7 @@ function matchPlaylist(regex, playlist, url) {
         resolutions.push(currentHeight);
 
         streams.push({
+            "bitrate": parseInt(matches[regex["bitrateIndex"]]),
             "height": currentHeight,
             "url": url.substring(0, url.lastIndexOf("/")) + "/" + matches[regex["urlIndex"]]
         });
