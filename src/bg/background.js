@@ -86,7 +86,7 @@ function handleRequest(details) {
 }
 
 function resolutionSwitched(resolution) {
-    logData(null, "Desired resolution is " + resolution + "p.");
+    logData("App", "Desired resolution is " + resolution + "p.");
 
     desiredResolution = parseInt(resolution);
 
@@ -198,7 +198,9 @@ function closest(arr, closestTo) {
 
 function logData(tabId, message) {
     if (tabId !== null) {
-        if (message == "New playlist.") {
+        if (tabId == "App") {
+            console.log("%c[" + tabId + "] " + message, "font-weight: bold;");
+        } else if (message == "New playlist.") {
             console.log("%c[#" + tabId + "] " + message, "font-weight: bold;");
         } else {
             console.log("[#" + tabId + "] " + message);
